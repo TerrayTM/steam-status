@@ -22,7 +22,7 @@ type requestInfo struct {
 }
 
 type wakeInfo struct {
-	Identifier string
+	Identifier int
 }
 
 type statusInfo struct {
@@ -65,12 +65,12 @@ func wakeHandler(w http.ResponseWriter, r *http.Request) {
 
 		var body wakeInfo
 		err := decoder.Decode(&body)
-		if err != nil || len(body.Identifier) == 0 {
+		if err != nil || body.Identifier == 0 {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
-		fmt.Fprintf(w, body.Identifier)
+		fmt.Fprintf(w, strconv.Itoa(body.Identifier))
 		return
 	}
 
