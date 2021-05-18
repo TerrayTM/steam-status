@@ -56,7 +56,11 @@ func hashStatus(s *statusInfo, r *requestInfo) string {
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Server is online!")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	requestQueueLock.Lock()
+	fmt.Fprintf(w, "Server is online! Currently has "+strconv.Itoa(len(requestQueue))+" entries in request queue and "+strconv.Itoa(len(statusCache))+" entries in cache!")
+	requestQueueLock.Unlock()
 }
 
 func wakeHandler(w http.ResponseWriter, r *http.Request) {
@@ -149,6 +153,13 @@ func gatherStatus(url string) *statusInfo {
 	return response
 }
 
+func restore(key string) {
+	delete(statusCache, key)
+	requestQueueLock.Lock()
+	delete(requestQueue, key)
+	requestQueueLock.Unlock()
+}
+
 func runUpdate() {
 	for {
 		requests := []requestInfo{}
@@ -191,30 +202,21 @@ func runUpdate() {
 
 				callback, err := client.Do(req)
 				if err != nil {
-					delete(statusCache, key)
-					requestQueueLock.Lock()
-					delete(requestQueue, key)
-					requestQueueLock.Unlock()
+					restore(key)
 					continue
 				}
 
 				defer callback.Body.Close()
 				body, err := ioutil.ReadAll(callback.Body)
 				if err != nil {
-					delete(statusCache, key)
-					requestQueueLock.Lock()
-					delete(requestQueue, key)
-					requestQueueLock.Unlock()
+					restore(key)
 					continue
 				}
 
 				jsonBody := callbackInfo{}
 
 				if json.Unmarshal(body, &jsonBody) != nil || !jsonBody.Success || len(jsonBody.Data.Refresh) == 0 {
-					delete(statusCache, key)
-					requestQueueLock.Lock()
-					delete(requestQueue, key)
-					requestQueueLock.Unlock()
+					restore(key)
 					continue
 				}
 
